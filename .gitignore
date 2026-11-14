@@ -24,3 +24,5 @@ Thumbs.db
 # Logs and temporary files
 *.log
 *.tmp
+/iceberg-rest-adapter.jar
+/iceberg_catalog_backup.dump
