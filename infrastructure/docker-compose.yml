@@ -1,0 +1,84 @@
+
+services:
+
+  minio:
+    image: lakehouse-minio:2025-10-15
+    build:
+      context: ./minio/source
+      dockerfile: ../Dockerfile
+      args:
+        MINIO_COMMIT: 7aac2a2c5b7c882e68c1ce017d8256be2feea27f
+        MINIO_COMMIT_TIME: "2026-02-12T20:18:48Z"
+    container_name: lakehouse-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      iceberg_net:
+        aliases:
+          - warehouse.minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  rest:
+    image: apache/iceberg-rest-fixture@sha256:009f9f6897cc1e8fd6e8133c401c7a3e7c333c71293a621d06d71570ae989c29
+    container_name: lakehouse-iceberg-rest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+    ports:
+      - "8181:8181"
+    networks:
+      - iceberg_net
+    restart: unless-stopped
+
+  spark:
+    image: tabulario/spark-iceberg@sha256:790a72e744e0d09f161e1b4c7c2f79625cc598cf0476da4703e62f1f4e023460
+    container_name: lakehouse-spark
+    depends_on:
+      - rest
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+    ports:
+      - "8888:8888"
+      - "8080:8080"
+      - "10000:10000"
+      - "10001:10001"
+    volumes:
+      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+      - ../warehouse:/home/iceberg/warehouse
+    networks:
+      iceberg_net:
+        aliases:
+          - spark-iceberg
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+    external: true
+    name: lakehouse_minio_data
+
+networks:
+  iceberg_net:
+    driver: bridge
