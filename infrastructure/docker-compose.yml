@@ -12,6 +12,8 @@ services:
       ICEBERG_DB_USER: ${ICEBERG_DB_USER}
       ICEBERG_DB_PASSWORD: ${ICEBERG_DB_PASSWORD}
       ICEBERG_DB_NAME: ${ICEBERG_DB_NAME}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
