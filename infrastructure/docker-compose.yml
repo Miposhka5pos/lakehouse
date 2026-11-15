@@ -105,6 +105,10 @@ services:
     volumes:
       - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
       - ../warehouse:/home/iceberg/warehouse
+      - ../jobs:/opt/spark/jobs:ro
+      - ./spark/requirements.txt:/opt/spark/requirements.txt:ro
+    command:
+      - "pip install --no-cache-dir -r /opt/spark/requirements.txt && notebook"
     networks:
       iceberg_net:
         aliases:
