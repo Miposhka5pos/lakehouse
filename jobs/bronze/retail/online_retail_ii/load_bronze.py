@@ -40,4 +40,4 @@ df_bronze.writeTo(
     "demo.bronze.online_retail_ii"
 ).using("iceberg").createOrReplace()
 
-print("Bronze table created successfully")
+print("Bronze table loaded successfully")
