@@ -104,7 +104,6 @@ services:
       - "10001:10001"
     volumes:
       - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
-      - ../warehouse:/home/iceberg/warehouse
       - ../jobs:/opt/spark/jobs:ro
       - ./spark/requirements.txt:/opt/spark/requirements.txt:ro
     command:
