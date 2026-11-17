@@ -16,7 +16,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./databases/iceberg-catalog-postgres/init:/docker-entrypoint-initdb.d:ro
     networks:
       - iceberg_net
     healthcheck:
@@ -126,3 +126,6 @@ networks:
   iceberg_net:
     name: lakehouse_iceberg_net
     driver: bridge
+
+include:
+  - path: ./airflow/docker-compose.yml
