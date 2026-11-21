@@ -103,9 +103,9 @@ services:
       - "10000:10000"
       - "10001:10001"
     volumes:
-      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
-      - ../jobs:/opt/spark/jobs:ro
-      - ./spark/requirements.txt:/opt/spark/requirements.txt:ro
+      - ../services/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+      - ../../applications/spark/retail/online_retail_ii:/opt/spark/jobs:ro
+      - ../services/spark/requirements.txt:/opt/spark/requirements.txt:ro
     command:
       - "pip install --no-cache-dir -r /opt/spark/requirements.txt && notebook"
     networks:
@@ -128,4 +128,4 @@ networks:
     driver: bridge
 
 include:
-  - path: ./airflow/docker-compose.yml
+  - path: ./airflow-compose.yml

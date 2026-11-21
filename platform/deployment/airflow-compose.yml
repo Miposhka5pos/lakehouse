@@ -6,10 +6,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD}@airflow-postgres:5432/airflow
     AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "${AIRFLOW_AUTH_USERNAME}:admin"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/config/simple_auth_manager_passwords.json
   volumes:
-    - ./dags:/opt/airflow/dags
-    - ./logs:/opt/airflow/logs
-    - ./config:/opt/airflow/config
+    - ../services/airflow/dags:/opt/airflow/dags
+    - ../services/airflow/logs:/opt/airflow/logs
+    - ../services/airflow/config:/opt/airflow/config
   networks:
     - airflow_net
     - iceberg_net
@@ -35,10 +37,16 @@ services:
 
   airflow-init:
     <<: *airflow-common
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW_AUTH_USERNAME: ${AIRFLOW_AUTH_USERNAME:?AIRFLOW_AUTH_USERNAME is required}
+      AIRFLOW_AUTH_PASSWORD: ${AIRFLOW_AUTH_PASSWORD:?AIRFLOW_AUTH_PASSWORD is required}
     entrypoint: /bin/bash
     command:
       - -c
       - |
+        set -e
+        python /opt/airflow/config/init_simple_auth.py
         airflow db migrate
     restart: "no"
     depends_on:
@@ -76,6 +84,8 @@ services:
 
 volumes:
   airflow_postgres_data:
+    external: true
+    name: lakehouse_airflow_postgres_data
 
 networks:
   airflow_net:

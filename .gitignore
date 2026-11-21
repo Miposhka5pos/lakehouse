@@ -28,3 +28,6 @@ Thumbs.db
 /iceberg_catalog_backup.dump
 
 scripts.txt
+
+platform/services/airflow/config/simple_auth_manager_passwords.json
+platform/services/airflow/config/simple_auth_manager_passwords.json.tmp
