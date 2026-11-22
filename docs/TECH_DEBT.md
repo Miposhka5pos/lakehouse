@@ -1,19 +1,20 @@
-# Technical Debt
+# Технический долг и бэклог
 
-This page tracks deferred engineering work that is intentionally out of scope for the current MVP.
+В этом документе собраны отложенные инженерные задачи, которые не входят в текущий MVP.
 
-## Spark Runner
+## Интеграция Apache Livy
 
-- [ ] **Recover job state after Runner restart.** Reconcile persisted Runner jobs with Spark Standalone applications after the Runner container restarts; distinguish a lost local `spark-submit` process from a Spark application that is still running.
-- [ ] **Support parallel Spark jobs.** Replace the MVP single-job execution constraint with configurable concurrency and define scheduling/queue behavior.
-- [ ] **Support job cancellation.** Add an API operation to cancel a submitted or running job and propagate cancellation to the Spark application.
-- [ ] **Add job execution timeouts.** Allow a configurable maximum runtime and define timeout handling, process termination, and final job status.
+- [ ] **Изучить и добавить Apache Livy для удалённого запуска Spark-приложений.**
+  - Развернуть Livy как отдельный сервис рядом со Spark и Hadoop/YARN.
+  - Настроить запуск PySpark-приложений в YARN Cluster Mode через Livy REST API.
+  - Интегрировать Airflow с Livy с помощью `LivyOperator`.
+  - Проверить передачу Python-файлов, зависимостей и конфигурации Spark, включая настройки Iceberg Catalog и MinIO.
+  - Проверить получение статусов выполнения, логов и обработку ошибок.
+  - Убедиться, что Airflow не требуется устанавливать Spark Client и Java: клиентская часть Spark должна находиться в окружении Livy.
+  - Зафиксировать требования к доступности файлов приложения и зависимостей для Livy и узлов кластера.
 
-## MVP constraints
+## Принятое архитектурное решение
 
-Until the items above are implemented:
-
-- Runner executes at most one Spark job at a time.
-- No job cancellation endpoint is provided.
-- Jobs have no automatic execution timeout.
-- After an unexpected Runner restart, the state of an in-flight job may require manual investigation.
+- Не разрабатывать и не поддерживать собственный FastAPI Spark Runner. Для удалённой отправки Spark-приложений в целевой архитектуре рассмотреть Apache Livy как готовый REST-сервис.
+- Использовать Airflow для оркестрации, Livy для подачи и отслеживания Spark-приложений, YARN для управления ресурсами кластера.
+- До реализации Livy продолжать использовать текущую интеграцию Airflow со Spark Standalone.
