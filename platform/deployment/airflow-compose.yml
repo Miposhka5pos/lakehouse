@@ -1,5 +1,9 @@
+
 x-airflow-common: &airflow-common
-  image: apache/airflow:3.1.8
+  image: lakehouse-airflow:3.1.8-spark-3.5.5
+  build:
+    context: ..
+    dockerfile: services/airflow/Dockerfile
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
@@ -9,7 +13,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "${AIRFLOW_AUTH_USERNAME}:admin"
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/config/simple_auth_manager_passwords.json
   volumes:
-    - ../services/airflow/dags:/opt/airflow/dags
+    - ../../applications/airflow/dags:/opt/airflow/dags
+    - ../../applications/spark:/opt/airflow/applications/spark:ro
     - ../services/airflow/logs:/opt/airflow/logs
     - ../services/airflow/config:/opt/airflow/config
   networks:
