@@ -1,9 +1,42 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit
+import os
 
 spark = (
     SparkSession.builder
     .appName("OnlineRetailII-Bronze")
+
+    # Iceberg
+    .config(
+        "spark.sql.extensions",
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+    )
+    .config(
+        "spark.sql.catalog.demo",
+        "org.apache.iceberg.spark.SparkCatalog",
+    )
+    .config("spark.sql.catalog.demo.type", "rest")
+    .config("spark.sql.catalog.demo.uri", "http://rest:8181")
+    .config(
+        "spark.sql.catalog.demo.io-impl",
+        "org.apache.iceberg.aws.s3.S3FileIO",
+    )
+    .config("spark.sql.catalog.demo.warehouse", "s3://warehouse/wh/")
+    .config("spark.sql.catalog.demo.s3.endpoint", "http://minio:9000")
+    .config("spark.sql.catalog.demo.s3.path-style-access", "true")
+    .config("spark.sql.defaultCatalog", "demo")
+
+    # MinIO / Hadoop S3A
+    .config("spark.hadoop.fs.s3a.endpoint", os.environ["MINIO_ENDPOINT_URL"])
+    .config("spark.hadoop.fs.s3a.access.key", os.environ["AWS_ACCESS_KEY_ID"])
+    .config("spark.hadoop.fs.s3a.secret.key", os.environ["AWS_SECRET_ACCESS_KEY"])
+    .config("spark.hadoop.fs.s3a.path.style.access", "true")
+    .config(
+        "spark.hadoop.fs.s3a.aws.credentials.provider",
+        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+    )
+    .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+
     .getOrCreate()
 )
 
