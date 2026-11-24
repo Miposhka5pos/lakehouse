@@ -16,6 +16,7 @@ x-airflow-common: &airflow-common
     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
     AWS_REGION: us-east-1
     MINIO_ENDPOINT_URL: http://minio:9000
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?AIRFLOW_JWT_SECRET is required}
   volumes:
     - ../../applications/airflow/dags:/opt/airflow/dags
     - ../services/airflow/logs:/opt/airflow/logs
