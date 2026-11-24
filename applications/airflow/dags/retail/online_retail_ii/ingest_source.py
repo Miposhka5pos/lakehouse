@@ -23,24 +23,27 @@ CONTENT_TYPE = (
 def download_and_upload_source() -> None:
     """Download the source XLSX and upload it to the MinIO landing zone."""
     endpoint_url = os.getenv("MINIO_ENDPOINT_URL", "http://minio:9000")
-    region_name = os.getenv("AWS_REGION", "us-east-1")
 
     logging.info("Downloading source file from %s", SOURCE_URL)
-    response = requests.get(SOURCE_URL, timeout=(15, 180))
+    response = requests.get(SOURCE_URL, timeout=(15, 300))
     response.raise_for_status()
 
     s3 = boto3.client(
         "s3",
         endpoint_url=endpoint_url,
-        region_name=region_name,
+        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+        region_name=os.getenv("AWS_REGION", "us-east-1"),
     )
 
+    file_size = len(response.content)
     logging.info(
         "Uploading %.2f MiB to s3://%s/%s",
-        len(response.content) / (1024 * 1024),
+        file_size / (1024 * 1024),
         S3_BUCKET,
         S3_KEY,
     )
+
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=S3_KEY,
@@ -48,7 +51,11 @@ def download_and_upload_source() -> None:
         ContentType=CONTENT_TYPE,
     )
 
-    logging.info("Source file uploaded successfully")
+    logging.info(
+        "Source file uploaded successfully: s3://%s/%s",
+        S3_BUCKET,
+        S3_KEY,
+    )
 
 
 with DAG(
@@ -67,4 +74,5 @@ with DAG(
     upload_source = PythonOperator(
         task_id="download_and_upload_source",
         python_callable=download_and_upload_source,
+        execution_timeout=timedelta(minutes=15),
     )
