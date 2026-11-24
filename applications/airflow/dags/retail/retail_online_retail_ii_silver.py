@@ -7,7 +7,7 @@ from airflow.providers.apache.spark.operators.spark_submit import (
 )
 
 SPARK_APPLICATION = (
-    "/opt/airflow/spark/jobs/retail/online_retail_ii/silver/build_silver.py"
+    "/opt/airflow/spark/jobs/silver/retail/online_retail_ii/build_online_retail_ii.py"
 )
 
 with DAG(

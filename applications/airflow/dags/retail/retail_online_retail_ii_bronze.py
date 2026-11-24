@@ -6,17 +6,12 @@ from airflow.providers.apache.spark.operators.spark_submit import (
     SparkSubmitOperator,
 )
 
-
-DAG_ID = "retail_online_retail_ii_bronze"
-
 SPARK_APPLICATION = (
-    "/opt/airflow/spark/jobs/retail/bronze/"
-    "online_retail_ii/build_bronze.py"
+    "/opt/airflow/spark/jobs/bronze/retail/online_retail_ii/build_online_retail_ii.py"
 )
 
-
 with DAG(
-    dag_id=DAG_ID,
+    dag_id="retail_online_retail_ii_bronze",
     description="Load Online Retail II data into Bronze Iceberg table",
     start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
     schedule=None,
