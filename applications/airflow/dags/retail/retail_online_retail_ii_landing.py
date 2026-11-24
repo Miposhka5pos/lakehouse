@@ -59,7 +59,7 @@ def download_and_upload_source() -> None:
 
 
 with DAG(
-    dag_id="retail_online_retail_ii_landing_ingest_source",
+    dag_id="retail_online_retail_ii_landing",
     description="Download Online Retail II XLSX and store it in MinIO landing",
     start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
     schedule=None,
