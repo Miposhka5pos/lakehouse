@@ -1,4 +1,3 @@
-
 x-airflow-common: &airflow-common
   image: lakehouse-airflow:3.1.8-spark-3.5.5
   build:
@@ -13,6 +12,10 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "${AIRFLOW_AUTH_USERNAME}:admin"
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/config/simple_auth_manager_passwords.json
     AIRFLOW_CONN_SPARK_DEFAULT: "spark://spark-iceberg:7077"
+    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+    AWS_REGION: us-east-1
+    MINIO_ENDPOINT_URL: http://minio:9000
   volumes:
     - ../../applications/airflow/dags:/opt/airflow/dags
     - ../services/airflow/logs:/opt/airflow/logs
@@ -34,7 +37,7 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     networks:
       - airflow_net
