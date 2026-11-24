@@ -10,7 +10,7 @@ from airflow.providers.apache.spark.operators.spark_submit import (
 DAG_ID = "retail_online_retail_ii_bronze"
 
 SPARK_APPLICATION = (
-    "/opt/airflow/spark/jobs/retail/"
+    "/opt/airflow/spark/jobs/retail/bronze/"
     "online_retail_ii/build_bronze.py"
 )
 
