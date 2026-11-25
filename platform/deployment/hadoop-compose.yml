@@ -1,0 +1,144 @@
+
+name: lakehouse-hadoop
+
+services:
+  namenode:
+    image: lakehouse-hadoop:3.3.6
+    hostname: namenode
+    user: hadoop
+    entrypoint: ["/usr/local/bin/dumb-init", "--"]
+    command:
+      - /bin/bash
+      - -lc
+      - |
+        if [ ! -f /data/dfs/name/current/VERSION ]; then
+          echo "Formatting HDFS NameNode for the empty volume..."
+          /opt/hadoop/bin/hdfs namenode -format -nonInteractive
+        fi
+        exec /opt/hadoop/bin/hdfs namenode
+    ports:
+      - "127.0.0.1:9870:9870"
+    volumes:
+      - namenode_data:/data
+      - ../services/hadoop/conf/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../services/hadoop/conf/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ../services/hadoop/conf/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml:ro
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      HDFS_NAMENODE_OPTS: "-Xms512m -Xmx768m"
+    mem_limit: 1g
+    cpus: 1.0
+    restart: unless-stopped
+    init: true
+    networks:
+      - iceberg_net
+
+  datanode:
+    image: lakehouse-hadoop:3.3.6
+    hostname: datanode
+    user: hadoop
+    command: ["/opt/hadoop/bin/hdfs", "datanode"]
+    volumes:
+      - datanode_data:/data
+      - ../services/hadoop/conf/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../services/hadoop/conf/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ../services/hadoop/conf/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml:ro
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      HDFS_DATANODE_OPTS: "-Xms512m -Xmx768m"
+    mem_limit: 1536m
+    cpus: 1.0
+    restart: unless-stopped
+    init: true
+    depends_on:
+      - namenode
+    networks:
+      - iceberg_net
+
+  resourcemanager:
+    image: lakehouse-hadoop:3.3.6
+    hostname: resourcemanager
+    user: hadoop
+    command: ["/opt/hadoop/bin/yarn", "resourcemanager"]
+    ports:
+      - "127.0.0.1:8088:8088"
+    volumes:
+      - ../services/hadoop/conf/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../services/hadoop/conf/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ../services/hadoop/conf/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml:ro
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      YARN_RESOURCEMANAGER_OPTS: "-Xms256m -Xmx512m"
+    mem_limit: 768m
+    cpus: 1.0
+    restart: unless-stopped
+    init: true
+    networks:
+      - iceberg_net
+
+  nodemanager-1:
+    image: lakehouse-hadoop:3.3.6
+    hostname: nodemanager-1
+    user: hadoop
+    command: ["/opt/hadoop/bin/yarn", "nodemanager"]
+    volumes:
+      - nodemanager_1_data:/data
+      - ../services/hadoop/conf/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../services/hadoop/conf/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ../services/hadoop/conf/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml:ro
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      YARN_NODEMANAGER_OPTS: "-Xms512m -Xmx768m"
+    mem_limit: 2560m
+    cpus: 2.0
+    restart: unless-stopped
+    init: true
+    depends_on:
+      - resourcemanager
+    networks:
+      - iceberg_net
+
+  nodemanager-2:
+    image: lakehouse-hadoop:3.3.6
+    hostname: nodemanager-2
+    user: hadoop
+    command: ["/opt/hadoop/bin/yarn", "nodemanager"]
+    volumes:
+      - nodemanager_2_data:/data
+      - ../services/hadoop/conf/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../services/hadoop/conf/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ../services/hadoop/conf/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml:ro
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      YARN_NODEMANAGER_OPTS: "-Xms512m -Xmx768m"
+    mem_limit: 2560m
+    cpus: 2.0
+    restart: unless-stopped
+    init: true
+    depends_on:
+      - resourcemanager
+    networks:
+      - iceberg_net
+
+volumes:
+  namenode_data:
+    name: lakehouse_hadoop_namenode_data
+
+  datanode_data:
+    name: lakehouse_hadoop_datanode_data
+
+  nodemanager_1_data:
+    name: lakehouse_hadoop_nodemanager_1_data
+
+  nodemanager_2_data:
+    name: lakehouse_hadoop_nodemanager_2_data
+
+networks:
+  iceberg_net:
+    name: lakehouse_iceberg_net
+    external: true

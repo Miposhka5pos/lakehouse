@@ -26,62 +26,30 @@ services:
       retries: 5
     restart: unless-stopped
 
-  minio:
-    image: lakehouse-minio:2025-10-15
-    build:
-      context: ./minio/source
-      dockerfile: ../Dockerfile
-      args:
-        MINIO_COMMIT: 7aac2a2c5b7c882e68c1ce017d8256be2feea27f
-        MINIO_COMMIT_TIME: "2026-02-12T20:18:48Z"
-    container_name: lakehouse-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      iceberg_net:
-        aliases:
-          - warehouse.minio
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/minio/health/live || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    restart: unless-stopped
-
   rest:
     image: lakehouse-iceberg-rest:local
     build:
-      context: ./rest
+      context: ../services/iceberg-rest
       dockerfile: Dockerfile
     container_name: lakehouse-iceberg-rest
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_healthy
     environment:
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      AWS_REGION: us-east-1
-
       CATALOG_CATALOG_NAME: demo
       CATALOG_CATALOG__IMPL: org.apache.iceberg.jdbc.JdbcCatalog
       CATALOG_URI: jdbc:postgresql://postgres:5432/iceberg_catalog
       CATALOG_JDBC_USER: ${ICEBERG_DB_USER}
       CATALOG_JDBC_PASSWORD: ${ICEBERG_DB_PASSWORD}
       CATALOG_JDBC_STRICT__MODE: "true"
-      CATALOG_WAREHOUSE: s3://warehouse/
-      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
-      CATALOG_S3_ENDPOINT: http://minio:9000
-      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+
+      CATALOG_WAREHOUSE: hdfs://namenode:9000/warehouse
+      CATALOG_IO__IMPL: org.apache.iceberg.hadoop.HadoopFileIO
+
+      HADOOP_CONF_DIR: /opt/hadoop-conf
+    volumes:
+      - ../services/hadoop/conf/core-site.xml:/opt/hadoop-conf/core-site.xml:ro
+      - ../services/hadoop/conf/hdfs-site.xml:/opt/hadoop-conf/hdfs-site.xml:ro
     ports:
       - "8181:8181"
     networks:
@@ -89,14 +57,16 @@ services:
     restart: unless-stopped
 
   spark:
-    image: tabulario/spark-iceberg@sha256:790a72e744e0d09f161e1b4c7c2f79625cc598cf0476da4703e62f1f4e023460
+    image: lakehouse-spark:3.5.5
+    build:
+      context: ../services/spark
+      dockerfile: Dockerfile
     container_name: lakehouse-spark
     depends_on:
       - rest
     environment:
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      AWS_REGION: us-east-1
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/spark/conf
     ports:
       - "8888:8888"
       - "8080:8080"
@@ -104,8 +74,10 @@ services:
       - "10001:10001"
     volumes:
       - ../services/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
-      - ../../applications/spark/retail/online_retail_ii:/opt/spark/jobs:ro
       - ../services/spark/requirements.txt:/opt/spark/requirements.txt:ro
+      - ../services/hadoop/conf/core-site.xml:/opt/spark/conf/core-site.xml:ro
+      - ../services/hadoop/conf/hdfs-site.xml:/opt/spark/conf/hdfs-site.xml:ro
+      - ../services/hadoop/conf/yarn-site.xml:/opt/spark/conf/yarn-site.xml:ro
     command:
       - "pip install --no-cache-dir -r /opt/spark/requirements.txt && notebook"
     networks:
@@ -115,9 +87,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  minio_data:
-    external: true
-    name: lakehouse_minio_data
   postgres_data:
     external: true
     name: lakehouse_postgres_data
