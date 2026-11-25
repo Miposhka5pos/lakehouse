@@ -1,14 +1,17 @@
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import (
     SparkSubmitOperator,
 )
 
+
 SPARK_APPLICATION = (
-    "/opt/airflow/spark/jobs/bronze/retail/online_retail_ii/build_online_retail_ii.py"
+    "/opt/airflow/spark/jobs/bronze/retail/online_retail_ii/"
+    "build_online_retail_ii.py"
 )
+
 
 with DAG(
     dag_id="retail_online_retail_ii_bronze",
@@ -28,12 +31,53 @@ with DAG(
         application=SPARK_APPLICATION,
         conn_id="spark_default",
         name="retail-online-retail-ii-bronze",
-        deploy_mode="client",
+        deploy_mode="cluster",
+
         packages=(
             "com.crealytics:spark-excel_2.12:3.5.1_0.20.4,"
-            "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.1,"
-            "org.apache.iceberg:iceberg-aws-bundle:1.8.1"
+            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.1"
         ),
+
+        conf={
+            # YARN
+            "spark.hadoop.yarn.resourcemanager.hostname": "resourcemanager",
+            "spark.hadoop.yarn.resourcemanager.address": "resourcemanager:8032",
+            "spark.yarn.submit.waitAppCompletion": "true",
+            "spark.yarn.stagingDir": "hdfs://namenode:9000/tmp/spark-staging",
+
+            # Resource allocation
+            "spark.executor.instances": "1",
+            "spark.executor.cores": "1",
+            "spark.executor.memory": "1g",
+            "spark.driver.cores": "1",
+            "spark.driver.memory": "1g",
+
+            # HDFS
+            "spark.hadoop.fs.defaultFS": "hdfs://namenode:9000",
+            "spark.hadoop.dfs.client.use.datanode.hostname": "true",
+
+            # Iceberg REST Catalog
+            "spark.sql.extensions": (
+                "org.apache.iceberg.spark.extensions."
+                "IcebergSparkSessionExtensions"
+            ),
+            "spark.sql.catalog.demo": (
+                "org.apache.iceberg.spark.SparkCatalog"
+            ),
+            "spark.sql.catalog.demo.type": "rest",
+            "spark.sql.catalog.demo.uri": "http://rest:8181",
+            "spark.sql.catalog.demo.io-impl": (
+                "org.apache.iceberg.hadoop.HadoopFileIO"
+            ),
+            "spark.sql.catalog.demo.warehouse": (
+                "hdfs://namenode:9000/warehouse"
+            ),
+            "spark.sql.defaultCatalog": "demo",
+
+            # Spark event logs
+            "spark.eventLog.enabled": "true",
+            "spark.eventLog.dir": "hdfs://namenode:9000/spark-events",
+        },
+
         verbose=True,
     )

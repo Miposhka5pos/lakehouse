@@ -1,76 +1,117 @@
+
+import logging
+
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit
-import os
-
-spark = (
-    SparkSession.builder
-    .appName("OnlineRetailII-Bronze")
-
-    # Iceberg
-    .config(
-        "spark.sql.extensions",
-        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
-    )
-    .config(
-        "spark.sql.catalog.demo",
-        "org.apache.iceberg.spark.SparkCatalog",
-    )
-    .config("spark.sql.catalog.demo.type", "rest")
-    .config("spark.sql.catalog.demo.uri", "http://rest:8181")
-    .config(
-        "spark.sql.catalog.demo.io-impl",
-        "org.apache.iceberg.aws.s3.S3FileIO",
-    )
-    .config("spark.sql.catalog.demo.warehouse", "s3://warehouse/wh/")
-    .config("spark.sql.catalog.demo.s3.endpoint", "http://minio:9000")
-    .config("spark.sql.catalog.demo.s3.path-style-access", "true")
-    .config("spark.sql.defaultCatalog", "demo")
-
-    # MinIO / Hadoop S3A
-    .config("spark.hadoop.fs.s3a.endpoint", os.environ["MINIO_ENDPOINT_URL"])
-    .config("spark.hadoop.fs.s3a.access.key", os.environ["AWS_ACCESS_KEY_ID"])
-    .config("spark.hadoop.fs.s3a.secret.key", os.environ["AWS_SECRET_ACCESS_KEY"])
-    .config("spark.hadoop.fs.s3a.path.style.access", "true")
-    .config(
-        "spark.hadoop.fs.s3a.aws.credentials.provider",
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-    )
-    .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-
-    .getOrCreate()
+from pyspark.sql.functions import current_timestamp, lit
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
 )
 
-jvm = spark.sparkContext._jvm
-jvm.org.apache.poi.util.IOUtils.setByteArrayMaxOverride(200_000_000)
-
-source_path = "s3a://warehouse/landing/retail/online_retail_ii/source.xlsx"
-
-df_2009 = (
-    spark.read
-    .format("excel")
-    .option("header", "true")
-    .option("inferSchema", "false")
-    .option("maxRowsInMemory", 1000)
-    .option("dataAddress", "'Year 2009-2010'!A1")
-    .load(source_path)
-    .withColumn("source_sheet", lit("Year 2009-2010"))
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
 )
 
-df_2010 = (
-    spark.read
-    .format("excel")
-    .option("header", "true")
-    .option("inferSchema", "false")
-    .option("maxRowsInMemory", 1000)
-    .option("dataAddress", "'Year 2010-2011'!A1")
-    .load(source_path)
-    .withColumn("source_sheet", lit("Year 2010-2011"))
+logger = logging.getLogger(__name__)
+
+SOURCE_FILE = (
+    "hdfs://namenode:9000/warehouse/landing/retail/"
+    "online_retail_ii/source.xlsx"
 )
 
-df_bronze = df_2009.unionByName(df_2010)
+TARGET_TABLE = "demo.bronze.online_retail_ii"
 
-df_bronze.writeTo(
-    "demo.bronze.online_retail_ii"
-).using("iceberg").createOrReplace()
+SHEETS = [
+    "Year 2009-2010",
+    "Year 2010-2011",
+]
 
-print("Bronze table loaded successfully")
+# Preserve original source values in the Bronze layer.
+SOURCE_SCHEMA = StructType([
+    StructField("Invoice", StringType(), True),
+    StructField("StockCode", StringType(), True),
+    StructField("Description", StringType(), True),
+    StructField("Quantity", StringType(), True),
+    StructField("InvoiceDate", StringType(), True),
+    StructField("Price", StringType(), True),
+    StructField("Customer ID", StringType(), True),
+    StructField("Country", StringType(), True),
+])
+
+
+def read_excel_sheet(spark, sheet_name):
+    logger.info("Reading Excel sheet: %s", sheet_name)
+
+    df = (
+        spark.read
+        .format("com.crealytics.spark.excel")
+        .option("dataAddress", f"'{sheet_name}'!A1")
+        .option("header", "true")
+        .option("maxRowsInMemory", "1000")
+        .option("treatEmptyValuesAsNulls", "true")
+        .option("usePlainNumberFormat", "true")
+        .schema(SOURCE_SCHEMA)
+        .load(SOURCE_FILE)
+    )
+
+    df = (
+        df
+        .withColumnRenamed("Customer ID", "Customer_ID")
+        .withColumn("source_sheet", lit(sheet_name))
+        .withColumn("source_file", lit(SOURCE_FILE))
+        .withColumn("ingested_at", current_timestamp())
+    )
+
+    return df
+
+
+def main():
+    spark = (
+        SparkSession.builder
+        .appName("retail-online-retail-ii-bronze")
+        .getOrCreate()
+    )
+
+    try:
+        logger.info("Starting Online Retail II Bronze ingestion")
+        logger.info("Source: %s", SOURCE_FILE)
+        logger.info("Target: %s", TARGET_TABLE)
+
+        # Create Bronze namespace if it does not exist.
+        spark.sql("CREATE NAMESPACE IF NOT EXISTS demo.bronze")
+
+        # Read both Excel sheets.
+        dataframes = [
+            read_excel_sheet(spark, sheet_name)
+            for sheet_name in SHEETS
+        ]
+
+        # Combine both periods into one dataset.
+        bronze_df = dataframes[0]
+
+        for df in dataframes[1:]:
+            bronze_df = bronze_df.unionByName(df)
+
+        logger.info("Writing Bronze Iceberg table: %s", TARGET_TABLE)
+
+        (
+            bronze_df.writeTo(TARGET_TABLE)
+            .using("iceberg")
+            .tableProperty("format-version", "2")
+            .createOrReplace()
+        )
+
+        logger.info("Bronze ingestion completed successfully")
+
+    except Exception:
+        logger.exception("Bronze ingestion failed")
+        raise
+
+    finally:
+        spark.stop()
+
+
+if __name__ == "__main__":
+    main()

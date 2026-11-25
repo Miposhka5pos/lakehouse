@@ -11,13 +11,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "${AIRFLOW_AUTH_USERNAME}:admin"
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/config/simple_auth_manager_passwords.json
-    AIRFLOW_CONN_SPARK_DEFAULT: "spark://spark-iceberg:7077"
+    AIRFLOW_CONN_SPARK_DEFAULT: '{"conn_type":"spark","host":"yarn"}'
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?AIRFLOW_JWT_SECRET is required}
+    HADOOP_CONF_DIR: /opt/hadoop-conf
   volumes:
     - ../../applications/airflow/dags:/opt/airflow/dags
     - ../services/airflow/logs:/opt/airflow/logs
     - ../services/airflow/config:/opt/airflow/config
     - ../../applications/airflow/spark:/opt/airflow/spark:ro
+    - ../services/hadoop/conf:/opt/hadoop-conf:ro
   networks:
     - airflow_net
     - iceberg_net
@@ -90,7 +92,6 @@ services:
 
 volumes:
   airflow_postgres_data:
-    external: true
     name: lakehouse_airflow_postgres_data
 
 networks:
