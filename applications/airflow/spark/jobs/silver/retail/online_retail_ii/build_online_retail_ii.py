@@ -1,13 +1,11 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import DecimalType
-import os
+
 
 spark = (
     SparkSession.builder
-    .appName("OnlineRetailII-Bronze")
-
-    # Iceberg
+    .appName("OnlineRetailII-Silver")
     .config(
         "spark.sql.extensions",
         "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
@@ -20,24 +18,13 @@ spark = (
     .config("spark.sql.catalog.demo.uri", "http://rest:8181")
     .config(
         "spark.sql.catalog.demo.io-impl",
-        "org.apache.iceberg.aws.s3.S3FileIO",
+        "org.apache.iceberg.hadoop.HadoopFileIO",
     )
-    .config("spark.sql.catalog.demo.warehouse", "s3://warehouse/wh/")
-    .config("spark.sql.catalog.demo.s3.endpoint", "http://minio:9000")
-    .config("spark.sql.catalog.demo.s3.path-style-access", "true")
-    .config("spark.sql.defaultCatalog", "demo")
-
-    # MinIO / Hadoop S3A
-    .config("spark.hadoop.fs.s3a.endpoint", os.environ["MINIO_ENDPOINT_URL"])
-    .config("spark.hadoop.fs.s3a.access.key", os.environ["AWS_ACCESS_KEY_ID"])
-    .config("spark.hadoop.fs.s3a.secret.key", os.environ["AWS_SECRET_ACCESS_KEY"])
-    .config("spark.hadoop.fs.s3a.path.style.access", "true")
     .config(
-        "spark.hadoop.fs.s3a.aws.credentials.provider",
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+        "spark.sql.catalog.demo.warehouse",
+        "hdfs://namenode:9000/warehouse",
     )
-    .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-
+    .config("spark.sql.defaultCatalog", "demo")
     .getOrCreate()
 )
 
@@ -52,12 +39,11 @@ df_silver = df_bronze.select(
         "InvoiceDate", "M/d/yy H:mm"
     ).alias("invoice_date"),
     F.col("Price").cast(DecimalType(10, 2)).alias("price"),
-    F.col("Customer ID").cast("int").alias("customer_id"),
+    F.col("Customer_ID").cast("int").alias("customer_id"),
     F.trim(F.col("Country")).alias("country"),
     F.col("source_sheet"),
 )
 
-# Data quality statistics
 quality_metrics = df_silver.select(
     F.count("*").alias("total_rows"),
     F.count(
@@ -82,3 +68,5 @@ df_silver.writeTo(
 ).using("iceberg").createOrReplace()
 
 print("Silver table loaded successfully")
+
+spark.stop()

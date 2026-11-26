@@ -35,7 +35,7 @@ with DAG(
 
         packages=(
             "com.crealytics:spark-excel_2.12:3.5.1_0.20.4,"
-            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.1"
+            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.2"
         ),
 
         conf={
@@ -43,7 +43,9 @@ with DAG(
             "spark.hadoop.yarn.resourcemanager.hostname": "resourcemanager",
             "spark.hadoop.yarn.resourcemanager.address": "resourcemanager:8032",
             "spark.yarn.submit.waitAppCompletion": "true",
-            "spark.yarn.stagingDir": "hdfs://namenode:9000/tmp/spark-staging",
+            "spark.yarn.stagingDir": (
+                "hdfs://namenode:9000/tmp/spark-staging"
+            ),
 
             # Resource allocation
             "spark.executor.instances": "1",
@@ -76,7 +78,9 @@ with DAG(
 
             # Spark event logs
             "spark.eventLog.enabled": "true",
-            "spark.eventLog.dir": "hdfs://namenode:9000/spark-events",
+            "spark.eventLog.dir": (
+                "hdfs://namenode:9000/spark-events"
+            ),
         },
 
         verbose=True,

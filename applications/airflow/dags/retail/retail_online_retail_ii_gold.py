@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from airflow import DAG
@@ -10,11 +9,12 @@ from airflow.providers.apache.spark.operators.spark_submit import (
 SPARK_JOBS_DIR = "/opt/airflow/spark/jobs/gold/retail"
 
 SPARK_PACKAGES = (
-    "com.crealytics:spark-excel_2.12:3.5.1_0.20.4,"
-    "org.apache.hadoop:hadoop-aws:3.3.4,"
-    "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.1,"
-    "org.apache.iceberg:iceberg-aws-bundle:1.8.1"
+    "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.2"
 )
+
+SPARK_CONF = {
+    "spark.yarn.stagingDir": "hdfs://namenode:9000/tmp/spark-staging",
+}
 
 
 default_args = {
@@ -41,8 +41,9 @@ with DAG(
         ),
         conn_id="spark_default",
         name="retail-online-retail-ii-gold-customer-performance",
-        deploy_mode="client",
+        deploy_mode="cluster",
         packages=SPARK_PACKAGES,
+        conf=SPARK_CONF,
         verbose=True,
     )
 
@@ -54,8 +55,9 @@ with DAG(
         ),
         conn_id="spark_default",
         name="retail-online-retail-ii-gold-monthly-sales",
-        deploy_mode="client",
+        deploy_mode="cluster",
         packages=SPARK_PACKAGES,
+        conf=SPARK_CONF,
         verbose=True,
     )
 
@@ -67,8 +69,9 @@ with DAG(
         ),
         conn_id="spark_default",
         name="retail-online-retail-ii-gold-product-performance",
-        deploy_mode="client",
+        deploy_mode="cluster",
         packages=SPARK_PACKAGES,
+        conf=SPARK_CONF,
         verbose=True,
     )
 
@@ -80,7 +83,12 @@ with DAG(
         ),
         conn_id="spark_default",
         name="retail-online-retail-ii-gold-product-sales",
-        deploy_mode="client",
+        deploy_mode="cluster",
         packages=SPARK_PACKAGES,
+        conf=SPARK_CONF,
         verbose=True,
     )
+
+build_customer_performance >> build_monthly_sales
+build_monthly_sales >> build_product_performance
+build_product_performance >> build_product_sales

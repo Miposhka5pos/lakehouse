@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from airflow import DAG
@@ -27,12 +26,12 @@ with DAG(
         application=SPARK_APPLICATION,
         conn_id="spark_default",
         name="retail-online-retail-ii-silver",
-        deploy_mode="client",
+        deploy_mode="cluster",
         packages=(
-            "com.crealytics:spark-excel_2.12:3.5.1_0.20.4,"
-            "org.apache.hadoop:hadoop-aws:3.3.4,"
-            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.1,"
-            "org.apache.iceberg:iceberg-aws-bundle:1.8.1"
+            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.2"
         ),
+        conf={
+            "spark.yarn.stagingDir": "hdfs://namenode:9000/tmp/spark-staging",
+        },
         verbose=True,
     )
