@@ -1,7 +1,17 @@
 
-FROM apache/hadoop:3.3.6
+FROM apache/hadoop:3.4.3
 
 USER root
+
+# Python 3.10 для Spark на YARN
+RUN curl -fL \
+    https://repo.anaconda.com/miniconda/Miniconda3-py310_24.3.0-0-Linux-x86_64.sh \
+    -o /tmp/miniconda.sh \
+    && bash /tmp/miniconda.sh -b -p /opt/conda \
+    && ln -s /opt/conda/bin/python3 /usr/local/bin/python3 \
+    && rm -f /tmp/miniconda.sh
+
+ENV PATH="/opt/conda/bin:${PATH}"
 
 RUN mkdir -p \
     /data/dfs/name \

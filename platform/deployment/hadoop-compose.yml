@@ -3,7 +3,7 @@ name: lakehouse-hadoop
 
 services:
   namenode:
-    image: lakehouse-hadoop:3.3.6
+    image: lakehouse-hadoop:3.4.3
     hostname: namenode
     user: hadoop
     entrypoint: ["/usr/local/bin/dumb-init", "--"]
@@ -35,7 +35,7 @@ services:
       - iceberg_net
 
   datanode:
-    image: lakehouse-hadoop:3.3.6
+    image: lakehouse-hadoop:3.4.3
     hostname: datanode
     user: hadoop
     command: ["/opt/hadoop/bin/hdfs", "datanode"]
@@ -58,7 +58,7 @@ services:
       - iceberg_net
 
   resourcemanager:
-    image: lakehouse-hadoop:3.3.6
+    image: lakehouse-hadoop:3.4.3
     hostname: resourcemanager
     user: hadoop
     command: ["/opt/hadoop/bin/yarn", "resourcemanager"]
@@ -80,7 +80,7 @@ services:
       - iceberg_net
 
   nodemanager-1:
-    image: lakehouse-hadoop:3.3.6
+    image: lakehouse-hadoop:3.4.3
     hostname: nodemanager-1
     user: hadoop
     command: ["/opt/hadoop/bin/yarn", "nodemanager"]
@@ -103,7 +103,7 @@ services:
       - iceberg_net
 
   nodemanager-2:
-    image: lakehouse-hadoop:3.3.6
+    image: lakehouse-hadoop:3.4.3
     hostname: nodemanager-2
     user: hadoop
     command: ["/opt/hadoop/bin/yarn", "nodemanager"]

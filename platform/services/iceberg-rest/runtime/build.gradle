@@ -1,0 +1,123 @@
+
+import org.gradle.api.attributes.Bundling
+import org.gradle.api.attributes.AttributeDisambiguationRule
+import org.gradle.api.attributes.MultipleCandidatesDetails
+
+plugins {
+    id 'base'
+}
+
+abstract class BundlingDisambiguationRule
+        implements AttributeDisambiguationRule<Bundling> {
+
+    @Override
+    void execute(MultipleCandidatesDetails<Bundling> details) {
+        def external = details.candidateValues.find {
+            it.name == Bundling.EXTERNAL
+        }
+
+        if (external != null) {
+            details.closestMatch(external)
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    restRuntime
+}
+
+dependencies {
+    attributesSchema {
+        attribute(Bundling.BUNDLING_ATTRIBUTE) {
+            disambiguationRules.add(BundlingDisambiguationRule)
+        }
+    }
+
+    restRuntime 'org.apache.iceberg:iceberg-open-api:1.10.2:test-fixtures'
+    restRuntime 'org.apache.iceberg:iceberg-core:1.10.2'
+    restRuntime 'org.apache.iceberg:iceberg-core:1.10.2:tests'
+
+    restRuntime 'org.eclipse.jetty:jetty-server:11.0.26'
+    restRuntime 'org.eclipse.jetty:jetty-servlet:11.0.26'
+
+    restRuntime 'org.xerial:sqlite-jdbc:3.50.3.0'
+
+    restRuntime 'org.apache.hadoop:hadoop-common:3.4.3'
+    restRuntime 'org.apache.hadoop:hadoop-hdfs-client:3.4.3'
+
+    restRuntime 'org.postgresql:postgresql:42.7.14'
+    restRuntime 'org.slf4j:slf4j-simple:2.0.17'
+}
+
+configurations.configureEach {
+    exclude group: 'org.slf4j', module: 'slf4j-reload4j'
+
+    resolutionStrategy.eachDependency {
+        if (requested.group == 'org.apache.hadoop') {
+            useVersion '3.4.3'
+        }
+    }
+}
+
+tasks.register('copyRestRuntime', Copy) {
+    from configurations.restRuntime
+    into layout.buildDirectory.dir('rest-runtime')
+}
+
+tasks.register('printRestRuntime') {
+    doLast {
+        configurations.restRuntime
+            .resolvedConfiguration
+            .resolvedArtifacts
+            .sort { it.moduleVersion.id.toString() }
+            .each {
+                println "${it.moduleVersion.id} -> ${it.file.name}"
+            }
+    }
+}
+
+tasks.register('checkRestServerClass') {
+    dependsOn 'copyRestRuntime'
+
+    doLast {
+        def target = 'org/apache/iceberg/rest/RESTCatalogServer.class'
+
+        def matches = fileTree(layout.buildDirectory.dir('rest-runtime'))
+            .matching { include '**/*.jar' }
+            .files
+            .findAll { jarFile ->
+                new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+                    zip.getEntry(target) != null
+                }
+            }
+
+        if (matches.isEmpty()) {
+            throw new GradleException('RESTCatalogServer.class not found')
+        }
+
+        matches.each {
+            println "RESTCatalogServer found in: ${it.name}"
+        }
+    }
+}
+
+tasks.register('runRestServer', JavaExec) {
+    dependsOn 'copyRestRuntime'
+
+    classpath = configurations.restRuntime
+    mainClass = 'org.apache.iceberg.rest.RESTCatalogServer'
+
+    environment 'CATALOG_CATALOG_NAME', 'demo'
+    environment 'CATALOG_CATALOG__IMPL',
+            'org.apache.iceberg.jdbc.JdbcCatalog'
+    environment 'CATALOG_URI',
+            'jdbc:sqlite:/tmp/iceberg-rest-smoke.db'
+    environment 'CATALOG_JDBC_USER', 'user'
+    environment 'CATALOG_JDBC_PASSWORD', 'password'
+    environment 'CATALOG_WAREHOUSE',
+            'file:///tmp/iceberg-rest-warehouse'
+}

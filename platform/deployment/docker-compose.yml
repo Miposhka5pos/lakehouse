@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
 
   spark:
-    image: lakehouse-spark:3.5.5
+    image: lakehouse-spark:3.5.10
     build:
       context: ../services/spark
       dockerfile: Dockerfile
@@ -79,7 +79,9 @@ services:
       - ../services/hadoop/conf/hdfs-site.xml:/opt/spark/conf/hdfs-site.xml:ro
       - ../services/hadoop/conf/yarn-site.xml:/opt/spark/conf/yarn-site.xml:ro
     command:
-      - "pip install --no-cache-dir -r /opt/spark/requirements.txt && notebook"
+      - /bin/bash
+      - -lc
+      - pip install --no-cache-dir -r /opt/spark/requirements.txt && notebook
     networks:
       iceberg_net:
         aliases:
