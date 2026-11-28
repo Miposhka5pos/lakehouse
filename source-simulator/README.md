@@ -32,7 +32,16 @@ docker compose --env-file source-simulator/deployment/.env -f source-simulator/d
 docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml ps
 ```
 
-Сеть `lakehouse_iceberg_net` должна быть создана основным Compose Lakehouse. PostgreSQL подключается к ней как внешний участник; существующие Compose-файлы Lakehouse не меняются.
+Сеть `lakehouse_iceberg_net` должна быть создана основным Compose Lakehouse. PostgreSQL подключается к ней как внешний участник. Для управления PostgreSQL используй PowerShell-скрипты из `source-simulator/tools` (они не запускают генератор и не заполняют базу):
+
+```powershell
+.\\source-simulator\\tools\\up.ps1
+.\\source-simulator\\tools\\status.ps1
+.\\source-simulator\\tools\\logs.ps1
+.\\source-simulator\\tools\\down.ps1
+```
+
+`up.ps1` поднимает только сервис `source-postgres`; схема создаётся SQL init-скриптами при первом создании пустого volume, но тестовые данные не генерируются.
 
 Данные сохраняются в отдельном volume `source_simulator_postgres_data`. Не используй `down -v`, если не собираешься намеренно удалять тестовую базу.
 
