@@ -20,21 +20,21 @@
 
 Инкрементальное чтение выполняется отдельно для каждой таблицы по `updated_at`. Запрос обязан включать строки с `is_deleted = TRUE`, чтобы передать tombstone в Lakehouse. Рекомендуется overlap window и идемпотентный MERGE в Silver.
 
-## Запуск
+## Запуск PostgreSQL
 
-Сначала создай внешнюю сеть Lakehouse и подними инфраструктуру, в Compose которой объявлена сеть `lakehouse_iceberg_net`.
-
-Из корня репозитория:
+Из корня репозитория скопируй шаблон окружения и задай локальный пароль:
 
 ```powershell
 Copy-Item source-simulator/deployment/.env.example source-simulator/deployment/.env
 # Измени POSTGRES_PASSWORD в source-simulator/deployment/.env
 
-docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml up -d
+docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml up -d source-postgres
 docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml ps
 ```
 
-Данные PostgreSQL сохраняются в отдельном volume `source_simulator_postgres_data`. Не используй `down -v`, если не собираешься намеренно удалять тестовую базу.
+Сеть `lakehouse_iceberg_net` должна быть создана основным Compose Lakehouse. PostgreSQL подключается к ней как внешний участник; существующие Compose-файлы Lakehouse не меняются.
+
+Данные сохраняются в отдельном volume `source_simulator_postgres_data`. Не используй `down -v`, если не собираешься намеренно удалять тестовую базу.
 
 Проверка готовности:
 
@@ -56,61 +56,53 @@ JDBC: jdbc:postgresql://source-postgres:5432/source_db
 
 ## Генерация данных
 
-Установи зависимости локально или запускай генератор в Python-контейнере. Пример для локального Python:
+Генератор запускается в отдельном Python 3.10 контейнере — локально устанавливать Python-зависимости не требуется.
+
+Собрать образ:
 
 ```powershell
-py -m venv source-simulator/.venv
-source-simulator/.venv/Scripts/Activate.ps1
-pip install -r source-simulator/simulator/requirements.txt
-
-$env:PGHOST = "localhost"
-$env:PGPORT = "5433"
-$env:PGDATABASE = "source_db"
-$env:PGUSER = "source_user"
-$env:PGPASSWORD = "значение из deployment/.env"
-
-python source-simulator/simulator/generate_data.py seed
+docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml build simulator
 ```
 
-По умолчанию создаются 500 клиентов, 200 товаров, 5 000 заказов и примерно 10 000–20 000 позиций. Один и тот же seed даёт одинаковые значения и идентификаторы. Повторный запуск не дублирует строки с теми же первичными ключами; он не очищает и не перезаписывает существующие данные.
-
-Настройка объёма:
+Начальное наполнение: 500 клиентов, 200 товаров, 5 000 заказов и примерно 10 000–20 000 позиций:
 
 ```powershell
-python source-simulator/simulator/generate_data.py seed --customers 500 --products 200 --orders 5000 --seed 42
+docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml run --rm simulator seed
 ```
+
+Объём можно изменить:
+
+```powershell
+docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml run --rm simulator seed --customers 500 --products 200 --orders 5000 --seed 42
+```
+
+Один и тот же seed даёт одинаковые значения и идентификаторы. Повторный запуск не дублирует строки с теми же первичными ключами; он не очищает и не перезаписывает существующие данные.
 
 Добавить новые заказы и позиции:
 
 ```powershell
-python source-simulator/simulator/generate_data.py insert-orders --count 20
+docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml run --rm simulator insert-orders --count 20
 ```
 
 Сымитировать изменения, логические удаления и восстановления:
 
 ```powershell
-python source-simulator/simulator/generate_data.py mutate --count 25
+docker compose --env-file source-simulator/deployment/.env -f source-simulator/deployment/docker-compose.yml run --rm simulator mutate --count 25
 ```
 
 Каждый UPDATE автоматически меняет `updated_at`. Генератор не выполняет физический DELETE.
 
 ## Проверка таблиц
 
-```sql
-SELECT 'customers' AS table_name, COUNT(*) FROM source_incremental.customers
-UNION ALL SELECT 'products', COUNT(*) FROM source_incremental.products
-UNION ALL SELECT 'orders', COUNT(*) FROM source_incremental.orders
-UNION ALL SELECT 'order_items', COUNT(*) FROM source_incremental.order_items;
+```powershell
+docker exec source-postgres psql -U source_user -d source_db -c "SELECT 'customers' AS table_name, COUNT(*) FROM source_incremental.customers UNION ALL SELECT 'products', COUNT(*) FROM source_incremental.products UNION ALL SELECT 'orders', COUNT(*) FROM source_incremental.orders UNION ALL SELECT 'order_items', COUNT(*) FROM source_incremental.order_items;"
+```
 
-SELECT status, COUNT(*)
-FROM source_incremental.orders
-GROUP BY status
-ORDER BY status;
+Проверить распределение статусов и soft delete:
 
-SELECT
-    COUNT(*) FILTER (WHERE is_deleted) AS soft_deleted,
-    COUNT(*) FILTER (WHERE NOT is_deleted) AS active
-FROM source_incremental.orders;
+```powershell
+docker exec source-postgres psql -U source_user -d source_db -c "SELECT status, COUNT(*) FROM source_incremental.orders GROUP BY status ORDER BY status;"
+docker exec source-postgres psql -U source_user -d source_db -c "SELECT COUNT(*) FILTER (WHERE is_deleted) AS soft_deleted, COUNT(*) FILTER (WHERE NOT is_deleted) AS active FROM source_incremental.orders;"
 ```
 
 ## Границы сценария
