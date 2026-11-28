@@ -1,0 +1,51 @@
+name: source-simulator
+
+services:
+  source-postgres:
+    image: postgres:17-alpine
+    container_name: source-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-source_db}
+      POSTGRES_USER: ${POSTGRES_USER:-source_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - source_postgres_data:/var/lib/postgresql/data
+      - ../db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      lakehouse_iceberg_net:
+        aliases:
+          - source-postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-source_user} -d ${POSTGRES_DB:-source_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  simulator:
+    build:
+      context: ../simulator
+      dockerfile: Dockerfile
+    environment:
+      PGHOST: source-postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-source_db}
+      PGUSER: ${POSTGRES_USER:-source_user}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    depends_on:
+      source-postgres:
+        condition: service_healthy
+    networks:
+      - lakehouse_iceberg_net
+    profiles: ["tools"]
+
+volumes:
+  source_postgres_data:
+    name: source_simulator_postgres_data
+
+networks:
+  lakehouse_iceberg_net:
+    external: true
+    name: lakehouse_iceberg_net

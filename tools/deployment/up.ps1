@@ -1,24 +1,14 @@
-
+param([ValidateSet("all", "lakehouse", "hadoop")][string]$Stack = "all")
 $ErrorActionPreference = "Stop"
-
 . "$PSScriptRoot\_common.ps1"
-
-# Prepare persistent Docker volumes.
-& "$PSScriptRoot\init-volumes.ps1"
-
-# Build Compose arguments.
-$ComposeArgs = Get-LakehouseComposeArgs
-
-# Validate Compose configuration before starting services.
-docker compose @ComposeArgs config --quiet
-
-if ($LASTEXITCODE -ne 0) {
-    throw "Invalid Docker Compose configuration."
+if ($Stack -in @("all", "lakehouse")) {
+    & "$PSScriptRoot\init-volumes.ps1"
+    $composeArgs = Get-LakehouseComposeArgs
+    Invoke-Compose -ComposeArgs $composeArgs -Arguments @("config", "--quiet") -FailureMessage "Invalid Lakehouse Compose configuration."
+    Invoke-Compose -ComposeArgs $composeArgs -Arguments @("up", "-d", "--build") -FailureMessage "Failed to start Lakehouse."
 }
-
-# Start services.
-docker compose @ComposeArgs up -d
-
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to start Lakehouse."
+if ($Stack -in @("all", "hadoop")) {
+    $composeArgs = Get-HadoopComposeArgs
+    Invoke-Compose -ComposeArgs $composeArgs -Arguments @("config", "--quiet") -FailureMessage "Invalid Hadoop Compose configuration."
+    Invoke-Compose -ComposeArgs $composeArgs -Arguments @("up", "-d", "--build") -FailureMessage "Failed to start Hadoop."
 }
