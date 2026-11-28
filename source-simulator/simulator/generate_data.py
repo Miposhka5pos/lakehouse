@@ -52,6 +52,7 @@ def seed_data(conn, customer_count: int, product_count: int, order_count: int, s
     rng = random.Random(seed)
     fake = Faker("en_US")
     fake.seed_instance(seed)
+    cur = conn.cursor()
     base_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
     customers = []
@@ -60,7 +61,7 @@ def seed_data(conn, customer_count: int, product_count: int, order_count: int, s
             customer_id, fake.name(), f"customer{customer_id}@example.test",
             rng.choice(COUNTRIES), base_time + timedelta(days=rng.randrange(730)),
         ))
-    conn.executemany(
+    cur.executemany(
         f"""INSERT INTO {SCHEMA}.customers
             (customer_id, customer_name, email, country, created_at)
             VALUES (%s, %s, %s, %s, %s)
@@ -75,7 +76,7 @@ def seed_data(conn, customer_count: int, product_count: int, order_count: int, s
             rng.choice(["piece", "kg", "pack", "liter"]),
             base_time + timedelta(days=rng.randrange(730)),
         ))
-    conn.executemany(
+    cur.executemany(
         f"""INSERT INTO {SCHEMA}.products
             (product_id, product_name, category, unit_of_measure, created_at)
             VALUES (%s, %s, %s, %s, %s)
@@ -110,7 +111,7 @@ def seed_data(conn, customer_count: int, product_count: int, order_count: int, s
             ))
             next_item_id += 1
 
-    conn.executemany(
+    cur.executemany(
         f"""INSERT INTO {SCHEMA}.orders
             (order_id, customer_id, order_date, status, country, created_at)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -118,7 +119,7 @@ def seed_data(conn, customer_count: int, product_count: int, order_count: int, s
         orders,
     )
     for batch in chunks(item_rows):
-        conn.executemany(
+        cur.executemany(
             f"""INSERT INTO {SCHEMA}.order_items
                 (order_item_id, order_id, product_id, quantity, unit_price, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
